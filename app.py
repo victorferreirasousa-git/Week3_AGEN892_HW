@@ -112,7 +112,7 @@ colormap = branca.colormap.LinearColormap(
 
 # Build the map with explicit tiles (more reliable on Streamlit Cloud)
 m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles=None, control_scale=True)
-folium.TileLayer('OpenStreetMap', name='OSM', control=False).add_to(m)
+folium.TileLayer('Stamen Terrain', control=False).add_to(m)
 
 def style_function(feature):
     name = feature["properties"]["name"]
