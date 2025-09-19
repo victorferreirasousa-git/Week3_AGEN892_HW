@@ -114,8 +114,10 @@ colormap = branca.colormap.LinearColormap(
     caption="State median county household income (2015 USD)",  # updated caption
 )
 
-# Folium map
-m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles="cartodbpositron")
+# --- Folium map (robust) ---
+# Use explicit tile layer instead of default; avoids some CDN blocks
+m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles=None)
+folium.TileLayer('OpenStreetMap', control=False).add_to(m)
 
 def style_function(feature):
     name = feature["properties"]["name"]
@@ -148,13 +150,17 @@ folium.GeoJson(
 ).add_to(m)
 
 colormap.add_to(m)
+folium.LayerControl(position='topright', collapsed=False).add_to(m)
 
-# Layout: map (left) and stats/table (right)
-left, right = st.columns([2, 1], gap="large")
-
+# --- Render in Streamlit (with fallback) ---
 with left:
     st.subheader("Interactive Map")
-    st_folium(m, height=600, width=None)
+    try:
+        # Use container width to avoid zero-width layout quirks
+        st_folium(m, height=600, use_container_width=True)
+    except Exception:
+        # Fallback renderer if streamlit-folium has issues
+        st.components.v1.html(m._repr_html_(), height=600, scrolling=False)
 
 # Right panel: dropdown + county table (2015 & 1989) with state medians
 state_options = sorted(state_medians["state"].tolist())
