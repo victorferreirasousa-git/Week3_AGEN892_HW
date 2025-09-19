@@ -5,6 +5,11 @@ import branca
 import streamlit as st
 from streamlit_folium import st_folium
 
+# Set the page layout to wide (full width)
+st.set_page_config(layout="wide")
+with open("./income_map.html", "r", encoding="utf-8") as f:
+    map_html = f.read()
+
 st.set_page_config(page_title="US State Income Map", layout="wide")
 st.title("US State Income Map")
 
@@ -52,7 +57,7 @@ colormap = branca.colormap.LinearColormap(
     colors=["#f7fbff", "#c6dbef", "#6baed6", "#2171b5", "#08306b"],
     vmin=vmin,
     vmax=vmax,
-    caption="State median county household income (2015 USD)",
+    caption="State median county household income",
 )
 
 # Folium map
@@ -126,4 +131,4 @@ with right:
     df_show = pd.concat([df_state, median_row], ignore_index=True)
 
     st.dataframe(df_show, use_container_width=True)
-    st.caption("The color bar reflects the 2015 median of county incomes per state.")
+    st.caption("The color bar reflects the median of county incomes per state.")
