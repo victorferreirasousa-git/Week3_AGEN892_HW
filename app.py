@@ -110,57 +110,46 @@ colormap = branca.colormap.LinearColormap(
     caption="State median county household income (2015 USD)",
 )
 
-# Build the map with explicit tiles (reliable on Streamlit Cloud)
-m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles=None, control_scale=True)
-folium.TileLayer(
-    tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attr="&copy; OpenStreetMap contributors",
-    control=False
+# Build a name <-> state (alpha-2) table, then attach 2015 medians to state NAMES
+name_map_df = pd.DataFrame(
+    {"name": list(name_to_alpha2.keys()), "state": list(name_to_alpha2.values())}
+)
+state_name_medians = name_map_df.merge(state_medians[["state", "median_2015"]], on="state", how="left")
+
+# Folium map with explicit tiles (robust on Streamlit Cloud)
+m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles="OpenStreetMap", control_scale=True)
+
+# Simple choropleth keyed by feature.properties.name
+folium.Choropleth(
+    geo_data=states_geo,
+    name="choropleth",
+    data=state_name_medians,
+    columns=["name", "median_2015"],
+    key_on="feature.properties.name",
+    fill_color="YlGnBu",
+    fill_opacity=0.8,
+    line_opacity=0.3,
+    line_color="white",
+    nan_fill_opacity=0.2,
+    legend_name="State median county household income (2015 USD)",  # caption matches homework
 ).add_to(m)
 
-def style_function(feature):
-    name = feature["properties"]["name"]
-    a2 = name_to_alpha2.get(name)
-    value = med_2015_by_alpha2.get(a2)
-    if value is None:
-        return {"fillOpacity": 0.2, "weight": 0.5, "color": "gray"}
-    return {"fillColor": colormap(value), "fillOpacity": 0.8, "weight": 0.7, "color": "white"}
-
-def on_each_feature(feature, layer):
-    name = feature["properties"]["name"]
-    a2 = name_to_alpha2.get(name)
-    v2015 = med_2015_by_alpha2.get(a2, float("nan"))
-    v1989 = med_1989_by_alpha2.get(a2, float("nan"))
-    html = f"""
-        <div style='font-size:13px'>
-            <b>{name}</b><br>
-            2015 median county income: ${v2015:,.0f}<br>
-            1989 median county income: ${v1989:,.0f}
-        </div>
-    """
-    folium.Tooltip(html, sticky=True).add_to(layer)
-
+# Lightweight tooltip layer with state name
 folium.GeoJson(
-    data=states_geo,
-    name="US States",
-    style_function=style_function,
-    highlight_function=lambda _: {"weight": 2, "color": "black", "fillOpacity": 0.9},
-    on_each_feature=on_each_feature,
+    states_geo,
+    name="labels",
+    tooltip=folium.GeoJsonTooltip(fields=["name"], aliases=["State:"], sticky=True),
+    style_function=lambda _: {"weight": 0, "color": "transparent", "fillOpacity": 0},
+    highlight_function=lambda _: {"weight": 2, "color": "black", "fillOpacity": 0.1},
 ).add_to(m)
 
-colormap.add_to(m)
-
-# Fit to contiguous U.S. bounds
+# Fit to U.S. bounds and show
 m.fit_bounds([[24.396308, -124.848974], [49.384358, -66.885444]])
-
-# IMPORTANT: render via a fixed-size Figure to avoid zero-height iframes
-fig = folium.Figure(width=1000, height=600)
-m.add_to(fig)
-html = fig.render()
 
 with left:
     st.subheader("Interactive Map")
-    st.components.v1.html(html, height=620, scrolling=False)
+    # Render as pure HTML (most robust)
+    st.components.v1.html(m.get_root().render(), height=640, scrolling=False)
 
 # ---- Right panel: dropdown + county table ----
 with right:
