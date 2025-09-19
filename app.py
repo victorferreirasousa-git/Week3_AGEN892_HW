@@ -6,7 +6,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 st.set_page_config(page_title="US State Income Map", layout="wide")
-st.title("US State Income Map (by 2015 Median County Income)")
+st.title("US State Income Map")
 
 @st.cache_data(ttl=86400)
 def load_data():
