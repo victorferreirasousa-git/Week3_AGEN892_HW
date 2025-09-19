@@ -13,27 +13,63 @@ with open("./income_map.html", "r", encoding="utf-8") as f:
 st.set_page_config(page_title="US State Income Map", layout="wide")
 st.title("US State Income Map")
 
+# One page_config, wide layout
+st.set_page_config(page_title="US State Income Map", layout="wide")
+st.title("US State Income Map (by 2015 Median County Income)")
+
 @st.cache_data(ttl=86400)
 def load_data():
-    # County income data
+    # ---- 1) County income data ----
     income = pd.read_csv(
         "https://raw.githubusercontent.com/pri-data/50-states/master/data/income-counties-states-national.csv",
-        dtype={"fips": str},
+        dtype=str,  # read as strings first; we coerce numerics below
     )
-    for col in ["income-2015", "income-1989"]:
-        income[col] = pd.to_numeric(income[col], errors="coerce")
+    income.columns = [c.strip() for c in income.columns]
 
-    # State polygons (GeoJSON)
+    # Helper to find columns robustly
+    def find_col(df, *aliases):
+        canon = {c.lower().replace(" ", "").replace("_", "").replace("-", ""): c for c in df.columns}
+        for a in aliases:
+            key = a.lower().replace(" ", "").replace("_", "").replace("-", "")
+            if key in canon:
+                return canon[key]
+        return None
+
+    c2015 = find_col(income, "income-2015", "income_2015", "income2015", "2015_income", "median_income_2015")
+    c1989 = find_col(income, "income-1989", "income_1989", "income1989", "1989_income", "median_income_1989")
+    cstate = find_col(income, "state", "state_abbr", "stateabbr")
+    ccounty = find_col(income, "county", "county_name")
+
+    missing = []
+    if c2015 is None: missing.append("income-2015")
+    if c1989 is None: missing.append("income-1989")
+    if cstate is None: missing.append("state")
+    if ccounty is None: missing.append("county")
+    if missing:
+        st.error(f"Input CSV is missing expected columns: {missing}\nFound: {list(income.columns)}")
+        st.stop()
+
+    income = income.rename(columns={c2015: "income-2015", c1989: "income-1989", cstate: "state", ccounty: "county"})
+    income["income-2015"] = pd.to_numeric(income["income-2015"], errors="coerce")
+    income["income-1989"] = pd.to_numeric(income["income-1989"], errors="coerce")
+
+    # ---- 2) State polygons (GeoJSON) ----
     states_geo = requests.get(
         "https://raw.githubusercontent.com/python-visualization/folium-example-data/main/us_states.json"
     ).json()
 
-    # State name -> 2-letter abbreviation
+    # ---- 3) State name -> 2-letter abbreviation ----
     abbrs = pd.DataFrame(
         requests.get(
             "https://gist.githubusercontent.com/tvpmb/4734703/raw/b54d03154c339ed3047c66fefcece4727dfc931a/US%2520State%2520List"
         ).json()
-    ).rename(columns={"abbreviation": "alpha2"})
+    )
+    name_col = find_col(abbrs, "name", "state", "statename")
+    a2_col   = find_col(abbrs, "abbreviation", "alpha-2", "alpha2", "abbr", "code")
+    if name_col is None or a2_col is None:
+        st.error(f"Unexpected schema for state list. Columns: {list(abbrs.columns)}")
+        st.stop()
+    abbrs = abbrs.rename(columns={name_col: "name", a2_col: "alpha2"})
     name_to_alpha2 = dict(zip(abbrs["name"], abbrs["alpha2"]))
 
     return income, states_geo, name_to_alpha2
@@ -57,7 +93,7 @@ colormap = branca.colormap.LinearColormap(
     colors=["#f7fbff", "#c6dbef", "#6baed6", "#2171b5", "#08306b"],
     vmin=vmin,
     vmax=vmax,
-    caption="State median county household income",
+    caption="State median county household income (2015 USD)",  # updated caption
 )
 
 # Folium map
@@ -112,13 +148,7 @@ with right:
 
     df_state = (
         income[income["state"] == chosen_state][["county", "income-1989", "income-2015"]]
-        .rename(
-            columns={
-                "county": "County",
-                "income-1989": "Income 1989 (USD)",
-                "income-2015": "Income 2015 (USD)",
-            }
-        )
+        .rename(columns={"county": "County", "income-1989": "Income 1989 (USD)", "income-2015": "Income 2015 (USD)"})
         .sort_values("County")
         .reset_index(drop=True)
     )

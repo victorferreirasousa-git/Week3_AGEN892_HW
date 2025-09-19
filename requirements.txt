@@ -5,3 +5,5 @@ numpy
 geopandas
 matplotlib
 streamlit-folium
+branca
+requests
