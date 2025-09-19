@@ -148,10 +148,9 @@ colormap.add_to(m)
 
 with left:
     st.subheader("Interactive Map")
-    try:
-        st_folium(m, height=600, use_container_width=True)
-    except Exception:
-        st.components.v1.html(m._repr_html_(), height=600, scrolling=False)
+    # Render Folium as pure HTML (most robust on Streamlit Cloud)
+    html = m._repr_html_()              # or: m.get_root().render()
+    st.components.v1.html(html, height=620, scrolling=False)
 
 # ---- Right panel: dropdown + county table ----
 with right:
