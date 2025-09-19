@@ -110,9 +110,13 @@ colormap = branca.colormap.LinearColormap(
     caption="State median county household income (2015 USD)",
 )
 
-# Build the map with explicit tiles (more reliable on Streamlit Cloud)
+# Build the map with explicit tiles (reliable on Streamlit Cloud)
 m = folium.Map(location=[39.8283, -98.5795], zoom_start=4, tiles=None, control_scale=True)
-folium.TileLayer('CartoDB positron', control=False).add_to(m)
+folium.TileLayer(
+    tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attr="&copy; OpenStreetMap contributors",
+    control=False
+).add_to(m)
 
 def style_function(feature):
     name = feature["properties"]["name"]
@@ -136,7 +140,6 @@ def on_each_feature(feature, layer):
     """
     folium.Tooltip(html, sticky=True).add_to(layer)
 
-# Add states layer
 folium.GeoJson(
     data=states_geo,
     name="US States",
@@ -145,21 +148,19 @@ folium.GeoJson(
     on_each_feature=on_each_feature,
 ).add_to(m)
 
-# Add colorbar
 colormap.add_to(m)
 
-# Fit to US bounds (lower-left, upper-right)
+# Fit to contiguous U.S. bounds
 m.fit_bounds([[24.396308, -124.848974], [49.384358, -66.885444]])
+
+# IMPORTANT: render via a fixed-size Figure to avoid zero-height iframes
+fig = folium.Figure(width=1000, height=600)
+m.add_to(fig)
+html = fig.render()
 
 with left:
     st.subheader("Interactive Map")
-    # 1) Try st_folium with explicit width
-    try:
-        st_folium(m, height=600, width=900, returned_objects=[], key="income_map")
-    except Exception:
-        # 2) Fallback: raw HTML (very robust)
-        html = m.get_root().render()
-        st.components.v1.html(html, height=620, scrolling=False)
+    st.components.v1.html(html, height=620, scrolling=False)
 
 # ---- Right panel: dropdown + county table ----
 with right:
